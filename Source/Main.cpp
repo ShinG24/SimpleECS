@@ -5,46 +5,6 @@
 #include "Chunk.h"
 #include "World.h"
 
-std::vector<int> data_size;
-std::vector<std::string> str;
-
-// typeid().nameを用いて型名をstringにする
-template<typename T>
-constexpr void AddStr()
-{
-	str.emplace_back(typeid(T).name());
-}
-
-// テンプレート 可変長引数実験
-// Head 先頭の型名 Tails 引数パック
-template<typename Head, typename ...Tails>
-constexpr void B()
-{
-	// パッキングされている引数の数を取得
-	const auto size = sizeof...(Tails);
-
-	AddStr<Head>();
-	data_size.emplace_back(size);
-
-	// パッキングされている引数がある場合は再帰呼び出し
-	// この形で渡すと一つずつ引数が減っていく
-	// char, short, int, int64		この4つをテンプレート引数として入れたとすると
-	// 1周目 B<Head = char,		...Tails = (short, int, int64)
-	// 2周目 B<Head = short,	...Tails = (int, int64)
-	// 3周目 B<Head = int,		...Tails = (int64)
-	// 4周目 B<Head = int64,	...Tails = ()
-	// みたいな感じで先頭にある引数がHeadに、それ以降の引数は...Tailsにパッキングされた状態で格納される
-	if constexpr ( size != 0 )
-		B<Tails...>();
-}
-
-template<typename ...Args>
-//template<typename ...Args>
-void A()
-{
-	B<Args...>();
-}
-
 struct Transform
 {
 	float3 position_;
@@ -65,6 +25,18 @@ struct DirectionLight
 	float3 direction_;
 	float3 color_;
 	float intensity_;
+};
+
+
+class TestSystem : public ecs::BaseSystem
+{
+public:
+	TestSystem() = default;
+
+	void Execute() override
+	{
+		std::cout << "Test System" << std::endl;
+	}
 };
 
 int main()
@@ -94,14 +66,18 @@ int main()
 		world.SetComponentData(entities.at(i), t);
 	}
 
-	auto chunks = world.GetChunks<Transform>();
-	auto it = chunks.begin();
-	auto array = (*it)->GetComponentArray<Transform>();
+	Vector<ComponentArray<Transform>> arrays{ world.GetComponentArrays<Transform>() };
 
 	Vector<Transform> t_array;
-	for(int i =0; i < array.size(); ++i)
+	for(const ComponentArray<Transform>& array : arrays)
 	{
-		t_array.emplace_back(array[i]);
+		for(const auto t : array)
+		{
+			t_array.emplace_back(t);
+		}
 	}
+
+	world.AddSystems<TestSystem>();
+	world.ExecuteSystems();
 	return 0;
 }

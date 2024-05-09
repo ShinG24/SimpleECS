@@ -10,7 +10,12 @@
 using ComponentId = u64;
 using ArchetypeId = u64;
 
-template<typename Head, typename ...Tails>
+#define GET_COMPONENT_ID(v) typeid(v).hash_code()
+#define GET_COMPONENT_NAME(v) typeid(v).name()
+#define GENERATE_COMPONENT_ID(v) typeid(v).hash_code()
+
+
+template<class Head, class ...Tails>
 bool IsArgsHasSameTypeImpl(UnorderedSet<ComponentId>& ids)
 {
 	const ComponentId id{ typeid(Head).hash_code() };
@@ -26,7 +31,7 @@ bool IsArgsHasSameTypeImpl(UnorderedSet<ComponentId>& ids)
 
 // ‰Â•Ï’·ˆø”“à‚É“¯‚¶Œ^‚ª•¡”ŠÜ‚Ü‚ê‚Ä‚¢‚È‚¢‚©Šm”F
 // true ŠÜ‚Ü‚ê‚Ä‚¢‚é false ŠÜ‚Ü‚ê‚Ä‚¢‚È‚¢
-template<typename ...Args>
+template<class ...Args>
 bool IsArgsHasSameType()
 {
 	UnorderedSet<ComponentId> ids;

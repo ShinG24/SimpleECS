@@ -11,7 +11,7 @@ public:
 
 	// 新たなArchetypeを作成
 	// ...Components	ComponentData いくつでも可
-	template<typename ...Components>
+	template<class ...Components>
 	constexpr static Archetype Create()
 	{
 		Archetype archetype{};
@@ -31,7 +31,7 @@ public:
 		return true;
 	}
 
-	template<typename ...Components>
+	template<class ...Components>
 	bool Contains() const
 	{
 		return ContainsImpl<Components...>();
@@ -45,27 +45,24 @@ private:
 	// 可変長引数を用いて渡された全コンポーネントのID、サイズ、名前を格納する
 	// Head				可変長引数の先頭のデータ
 	// ...Components	残りの可変長引数データ
-	template<typename Head, typename ...Components>
+	template<class Head, class ...Components>
 	static void CreateImpl(Archetype& archetype)
 	{
-		// constexprにすることでコンパイル時に実行してしまう
 		const u32 size{ static_cast<u32>(sizeof(Head)) };
-		const u64 id{ typeid(Head).hash_code() };
-		const String name{ typeid(Head).name() };
+		const ComponentId id{ GET_COMPONENT_ID(Head) };
+		const String name{ GET_COMPONENT_NAME(Head) };
 
 		// idが被ることはありえないのでアサート
 		// このアサートが発行される→同じ型のコンポーネントを複数使用している(可変長引数に同じ型のコンポーネントが含まれる)
 #ifdef _DEBUG
 		for(const auto& val : archetype.component_name_ | std::views::values)
 		{
-			//_ASSERT_EXPR(val == name, L"同じコンポーネントが指定されています");
-			//static_assert(val == name, "同じコンポーネントが指定されています");
+			_ASSERT_EXPR(val != name, L"同じコンポーネントが指定されています");
 		}
 #endif
 
 		// 上のアサートが出ずにこちらのアサートが出た場合はhash_codeを作る機能を自作する必要がある
-		//_ASSERT_EXPR(!archetype.component_ids_.contains(id), L"typeid::hash_code()が被った値を出力しました");
-		//static_assert(!archetype.component_ids_.contains(id), "typeid::hash_code()が被った値を出力しました");
+		_ASSERT_EXPR(!archetype.component_ids_.contains(id), L"typeid::hash_code()が被った値を出力しました");
 
 		archetype.component_ids_.insert(id);
 		archetype.component_size_.insert({ id, size });
@@ -80,11 +77,11 @@ private:
 	}
 
 	// 指定されたコンポーネントを保持しているか確認
-	template<typename Head, typename ...Tails>
+	template<class Head, class ...Tails>
 	bool ContainsImpl() const
 	{
 		// 型情報からハッシュコードを割り出し、保持しているか確認
-		const u64 id{ typeid(Head).hash_code() };
+		const ComponentId id{ GET_COMPONENT_ID(Head) };
 		if(component_ids_.contains(id))
 		{
 			// 保持していた場合は、指定されたComponentsの数によって処理わけ

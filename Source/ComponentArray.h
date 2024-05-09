@@ -15,8 +15,14 @@ public:
 		return begin_[index];
 	}
 
-	T* begin() { return begin_; }
-	T* end() { return begin_ + size_; }
+	T& at(const int index)
+	{
+		_ASSERT_EXPR(index < size_, L"Out of Range");
+		return begin_[index];
+	}
+
+	T* begin() const { return begin_; }
+	T* end() const { return begin_ + size_; }
 
 	u32 size() const { return size_; }
 private:

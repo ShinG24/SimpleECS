@@ -39,7 +39,7 @@ public:
 	// Chunkの作成
 	// size このチャンクに格納するEntityの数
 	// ...Components 使用する予定のコンポーネント
-	template<typename ...Components>
+	template<class ...Components>
 	static Chunk Create(u32 size)
 	{
 		//_ASSERT_EXPR(size > 0, L"0より大きい値を指定してください");
@@ -63,7 +63,7 @@ public:
 	// 全く同じComponentsを保持しているか
 	// 例 引数<Transform, Camera, Light> : 保持<Transform, Camera, Light, Mesh> この場合はfalseを返す
 	// 完璧に一致しているときだけtrueを返す
-	template<typename ...Components>
+	template<class ...Components>
 	bool IsSame() const
 	{
 		// 引数の数と保持しているコンポーネントの数が違うなら同じなわけがない
@@ -77,37 +77,34 @@ public:
 		return this->archetype_.Contains<Components...>();
 	}
 
-	// 指定されたComponentをすべて保持しているかどうか 一つでも保持していない場合はfalse
-	// インスタンスが指定されていないComponentを保持していてもtrue
+	// 指定されたComponentをすべて保持しているかどうか
+	// 保持しているけどEntityが一つもない or 一つでも保持していない場合 → false
+	// インスタンスがプラスアルファで指定されていないコンポーネントを所持している → true
 	// 例 引数<Transform, Light> : 保持<Transform, Light, Camera> これだとtrueを返す
-	template<typename ...Components>
+	template<class ...Components>
 	bool Contains() const
 	{
-		return archetype_.Contains<Components...>();
+		return !entity_index_.empty() && archetype_.Contains<Components...>();
 	}
 
 	// Componentのデータを取得
 	// T 取得したいComponentの型
 	// entity Componentを保持しているEntityのID
-	template<typename T>
-	T GetComponentData(Entity entity)
+	template<class Component>
+	Component GetComponentData(Entity entity)
 	{
-		//static_assert(archetype_.Contains<T>(), "保持していない型を指定しないでください");
-		//static_assert(entity_index_.contains(entity), "保持していないEntityを指定しないでください");
 		_ASSERT_EXPR(entity_index_.contains(entity), "保持していないEntityを指定しないでください");
 
-		const u64 id{ typeid(T).hash_code() };
-		const u64 size{ sizeof(T) };
-#ifdef _DEBUG
+		const ComponentId id{ GET_COMPONENT_ID(Component) };
+		const u64 size{ sizeof(Component) };
 		_ASSERT_EXPR(size == archetype_.component_size_.at(id), L"Archetypeに保存されているサイズとsizeof(T)のサイズが異なります");
-#endif
 
 		const u32 index{ entity_index_.at(entity) };
 		_ASSERT_EXPR(size != 0, L"データのサイズが0でした");
 		_ASSERT_EXPR(index < size, L"サイズよりも大きな値のインデックスが出ました");
 
 		const u64 offset_bytes{ component_offsets_.at(id) + index * size };
-		T ret;
+		Component ret;
 		std::memcpy(&ret, &buffer_[offset_bytes], size);
 
 		return ret;
@@ -115,18 +112,17 @@ public:
 
 	// 指定されたCompoentの配列を取得
 	// T 取得したいComponentの型
-	template<typename T>
-	ComponentArray<T> GetComponentArray()
+	template<class Component>
+	ComponentArray<Component> GetComponentArray()
 	{
-		const ComponentId id{ typeid(T).hash_code() };
-		const u32 structure_stride{ sizeof(T) };
+		const ComponentId id{ GET_COMPONENT_ID(Component) };
 		const u32 size{ size_ - capacity_ };
 
-		_ASSERT_EXPR(archetype_.Contains<T>(), L"保持していない型が指定されました");
+		_ASSERT_EXPR(archetype_.Contains<Component>(), L"保持していない型が指定されました");
 
 		const u32 offset{ component_offsets_.at(id) };
-		void* start{ &buffer_[offset] };
-		ComponentArray<T> ret(static_cast<T*>(start), size);
+		void* begin{ &buffer_[offset] };
+		ComponentArray<Component> ret(static_cast<Component*>(begin), size);
 
 		return ret;
 	}
@@ -135,20 +131,20 @@ public:
 	// T セットしたいComponentの型
 	// entity Componentを保持しているEntityのID
 	// t セットしたいComponentのデータ
-	template<typename T>
-	void SetComponentData(Entity entity, const T& t)
+	template<class Component>
+	void SetComponentData(Entity entity, const Component& t)
 	{
-		VerifyHolding<T>();
+		VerifyHolding<Component>();
 
-		const ComponentId id{ typeid(T).hash_code() };
-		const u32 structure_stride{ sizeof(T) };
+		const ComponentId id{ GET_COMPONENT_ID(Component) };
+		const u32 structure_stride{ sizeof(Component) };
 		const u32 index{ entity_index_.at(entity) };
 
-		_ASSERT_EXPR(archetype_.Contains<T>(), L"保持していない型が指定されました");
+		_ASSERT_EXPR(archetype_.Contains<Component>(), L"保持していない型が指定されました");
 		const u32 offset{ component_offsets_.at(id) +  index * structure_stride };
-		void* start{ &buffer_[offset] };
+		void* begin{ &buffer_[offset] };
 
-		std::memcpy(start, &t, structure_stride);
+		std::memcpy(begin, &t, structure_stride);
 	}
 
 	// Entityを追加
@@ -189,11 +185,12 @@ public:
 	}
 
 	[[nodiscard]] const Archetype& GetArchetype() const { return archetype_; }
+
 private:
 
 	// Debug専用 このクラスが指定されたコンポーネントを保持しているか確認
 	// 保持している場合は何もないが保持していない場合はアサートが出る
-	template<typename ...Components>
+	template<class ...Components>
 	void VerifyHolding() const
 	{
 #ifdef _DEBUG
@@ -208,7 +205,7 @@ private:
 	UniquePtr<u8[]> buffer_{};	// 実際にデータを保持しているメモリ空間
 	u32 size_{};		// バイトではなく個数
 	u32 capacity_{};	// バイトではなく個数
-	UnorderedMap<Entity, u32> entity_index_{};	// Entity→Component Array Index
+	UnorderedMap<Entity, u32> entity_index_{};	// Entity→Component Array Index 保持しているEntityとComponentArrayのどこにデータが入っているかを示すIndexのマップ
 	UnorderedMap<ComponentId, u32> component_offsets_{};	// 各コンポーネントが格納されているアドレスのオフセット//buffer_の先頭からのオフセット
 	Set<u32> free_indices_{};	//解放済みインデックス
 };

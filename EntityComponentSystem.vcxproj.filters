@@ -14,5 +14,6 @@
     <ClInclude Include="Source\World.h" />
     <ClInclude Include="Source\Entity.h" />
     <ClInclude Include="Source\ComponentArray.h" />
+    <ClInclude Include="Source\System.h" />
   </ItemGroup>
 </Project>

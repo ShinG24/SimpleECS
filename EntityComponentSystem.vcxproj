@@ -137,6 +137,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Archetype.h" />
+    <ClInclude Include="Source\System.h" />
     <ClInclude Include="Source\Chunk.h" />
     <ClInclude Include="Source\CommonHeader.h" />
     <ClInclude Include="Source\ComponentArray.h" />

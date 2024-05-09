@@ -25,8 +25,6 @@ private:
 	u32 version_;	// EntityのVersion 同じidが使われる可能性があるので、世代で本当に同じやつか確認する
 	EntityId id_;			// Entityのid guid この値が使われてる間は同じ値は出現しない
 };
-
-
 namespace std{
     template<>
     struct hash<Entity>{
