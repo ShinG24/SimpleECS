@@ -6,6 +6,8 @@
 #include "Entity.h"
 #include "ComponentArray.h"
 
+#define ALLOW_BLANK 0
+
 
 class Chunk
 {
@@ -154,6 +156,7 @@ public:
 		if(entity_index_.contains(entity)) _ASSERT_EXPR(FALSE, L"すでに持っているEntityを渡さないでください");
 		u32 index{};
 
+#if ALLOW_BLANK
 		// free_indexに値が入っているかどうかで処理を変える
 		// 可能な限りデータを連続させたいのでfree_indexの値を優先して使う
 		if(!free_indices_.empty())
@@ -166,6 +169,10 @@ public:
 		{
 			index = size_ - capacity_;
 		}
+#else
+		index = size_ - capacity_;
+		index_entity_map_.insert({ index, entity });
+#endif
 		entity_index_.insert({ entity, index });
 
 		--capacity_;
@@ -178,10 +185,62 @@ public:
 		if(!entity_index_.contains(entity)) _ASSERT_EXPR(FALSE, L"保持していないEntityを削除しようとしないでください");
 
 		const auto it{ entity_index_.find(entity) };
-		const u32 index{ it->second };
+		const u32 free_index{ it->second };
 		entity_index_.erase(it);
 
+#if ALLOW_BLANK
 		free_indices_.insert(index);
+#else
+
+		// TODO Entityの削除処理について考える
+		// 以下の処理を行うことで確実にデータが連続した状態になるので更新処理などは早くなる
+		// ただし、一番うしろのデータが誰かわからないのでfor分を回して探す必要がある O(n)の処理負荷
+		// 多少のメモリを犠牲にするならindexからEntityを見つけるmapを作る
+
+		// 一番最後に割り当てたデータを空いたところに移動させる
+		// sizeとcapacityから一番後ろのindexを割り出し
+		const u32 end_index{ size_ - (capacity_ + 1) };
+
+#if 0
+		// entityとindexを紐づけている値を更新
+		for(auto& value : entity_index_)
+		{
+			if(value.second == end_index)
+			{
+				value.second = index;
+				break;
+			}
+		}
+#else
+
+		// index_entity_mapからBufferの最後尾を割り当てられているEntityを取得
+		// EntityとIndexを紐づけているデータを更新
+		// index_entity_mapから最後尾のデータを削除
+		// index_entity_mapのfree_index番目のentityを更新
+		const auto ie_it{ index_entity_map_.find(end_index) };
+		const Entity end_entity{ (*ie_it).second };
+		entity_index_.at(end_entity) = free_index;
+		index_entity_map_.erase(ie_it);
+		index_entity_map_.at(free_index) = end_entity;
+
+#endif
+
+
+
+		// comopnentのデータを入れ替え
+		for(const auto component_offset : component_offsets_)
+		{
+			const u32 size{ archetype_.component_size_.at(component_offset.first) };
+			const u32 begin_offset_bytes{ component_offset.second };
+
+			void* new_location{ &buffer_[begin_offset_bytes + size * free_index] };
+			const void* old_location{ &buffer_[begin_offset_bytes + size * end_index] };
+
+			std::memcpy(new_location, old_location, size);
+		}
+
+		++capacity_;
+#endif
 	}
 
 	[[nodiscard]] const Archetype& GetArchetype() const { return archetype_; }
@@ -207,5 +266,10 @@ private:
 	u32 capacity_{};	// バイトではなく個数
 	UnorderedMap<Entity, u32> entity_index_{};	// Entity→Component Array Index 保持しているEntityとComponentArrayのどこにデータが入っているかを示すIndexのマップ
 	UnorderedMap<ComponentId, u32> component_offsets_{};	// 各コンポーネントが格納されているアドレスのオフセット//buffer_の先頭からのオフセット
-	Set<u32> free_indices_{};	//解放済みインデックス
+
+#if ALLOW_BLANK
+	UnorderedSet<u32> free_indices_{};
+#else
+	UnorderedMap<u32, Entity> index_entity_map_{};	// 割り当てられてるIndexからEntityを特定するためのmap
+#endif
 };

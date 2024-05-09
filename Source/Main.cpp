@@ -10,6 +10,14 @@ struct Transform
 	float3 position_;
 	float3 scaling_;
 	float4 rotation_;
+
+	float4x4 world_matrix_
+	{
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	};
 };
 
 struct Camera
@@ -39,6 +47,36 @@ public:
 	}
 };
 
+class UpdateTransform : public ecs::BaseSystem
+{
+public:
+	UpdateTransform() = default;
+
+	void Execute() override
+	{
+		Vector<float3> positions;
+		Vector<float4x4> world_matrix;
+		auto transform_array{ world_->GetComponentArrays<Transform>() };
+		for(auto array : transform_array)
+		{
+			for(auto& t : array)
+			{
+				const float3 s{ t.scaling_ };
+				const float4 r{ t.rotation_ };
+				const float3 p{ t.position_ };
+				const XMMATRIX S{ XMMatrixScaling(s.x, s.y, s.z) };
+				const XMMATRIX R{ XMMatrixRotationRollPitchYaw(r.x, r.y, r.z) };
+				const XMMATRIX T{ XMMatrixTranslation(p.x, p.y, p.z) };
+				const XMMATRIX W{ S * R * T };
+				XMStoreFloat4x4(&t.world_matrix_, W);
+			}
+		}
+	}
+
+private:
+};
+
+
 int main()
 {
 	ecs::World world;
@@ -55,7 +93,7 @@ int main()
 	Transform t;
 	t.position_ = float3(0.1f, 0.1f, 0.1f);
 	t.scaling_ = float3(1.0f, 1.0f, 1.0f);
-	t.rotation_ = float4(0.1f, 2.0f, 3.14f, 0.0f);
+	t.rotation_ = float4(0.0f, 0.0f, 0.0f, 1.0f);
 
 	float factor = 0.1f;
 	for(int i = 0; i < 100; ++i)
@@ -66,18 +104,25 @@ int main()
 		world.SetComponentData(entities.at(i), t);
 	}
 
+
+	world.AddSystems<TestSystem, UpdateTransform>();
+	
+	world.ExecuteSystems();
+
 	Vector<ComponentArray<Transform>> arrays{ world.GetComponentArrays<Transform>() };
 
 	Vector<Transform> t_array;
+	Vector<float4x4> world_matrix_array;
 	for(const ComponentArray<Transform>& array : arrays)
 	{
 		for(const auto t : array)
 		{
 			t_array.emplace_back(t);
+			world_matrix_array.emplace_back(t.world_matrix_);
 		}
 	}
 
-	world.AddSystems<TestSystem>();
-	world.ExecuteSystems();
+	world.RemoveEntity(entities.at(0));
+	Entity entity = world.AddEntity<Transform>();
 	return 0;
 }

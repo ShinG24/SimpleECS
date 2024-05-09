@@ -28,6 +28,7 @@ using namespace DirectX;
 using float2 = XMFLOAT2;
 using float3 = XMFLOAT3;
 using float4 = XMFLOAT4;
+using float4x4 = XMFLOAT4X4;
 
 template<class T>
 using UniquePtr = std::unique_ptr<T>;

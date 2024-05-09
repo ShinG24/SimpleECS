@@ -61,7 +61,7 @@ namespace ecs
 				systems_.emplace_back(std::move(system));
 			}
 
-			if constexpr(sizeof...(Tails) != 0) AddSystemImpl<Tails...>();
+			if constexpr(sizeof...(Tails) != 0) AddSystemImpl<Tails...>(world);
 		}
 
 	private:
