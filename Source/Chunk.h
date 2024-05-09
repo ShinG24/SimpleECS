@@ -110,6 +110,8 @@ public:
 	}
 
 	// 指定されたCompoentの配列を取得
+	// 注意 :		戻り値をインスタンスとして保持し続けるのはだめ Entityの追加や削除によるメモリの変動を保証できない
+	//				そのためスコープ内でのみの使用とし、使いたいときは都度この関数を使ってComponentArrayを取得すること
 	// T 取得したいComponentの型
 	template<class Component>
 	ComponentArray<Component> GetComponentArray()
@@ -151,6 +153,11 @@ public:
 	void AddEntity(Entity entity)
 	{
 		if(entity_index_.contains(entity)) _ASSERT_EXPR(FALSE, L"すでに持っているEntityを渡さないでください");
+
+		if(capacity_ == 0)
+		{
+			Resize(size_ * 2);
+		}
 		u32 index{ size_ - capacity_ };
 		index_entity_map_.insert({ index, entity });
 		entity_index_.insert({ entity, index });
@@ -202,6 +209,31 @@ public:
 
 private:
 
+	void Resize(u32 size)
+	{
+		const u32 old_size{ size_ };
+		const u32 new_size{ size };
+		UniquePtr<u8[]> tmp_buffer = std::make_unique<u8[]>(new_size * archetype_.size_);
+
+		// BufferOffsetとComponentデータの更新
+		for(auto& component_offset : component_offsets_)
+		{
+			const u32 structure_stride{ archetype_.component_size_.at(component_offset.first) };
+			const u32 old_offsets{ component_offset.second };
+			const u32 new_offsets{ component_offset.second / old_size * new_size };
+			const u32 buffer_read_size{ structure_stride * old_size };
+
+			std::memcpy(&tmp_buffer[new_offsets], &buffer_[old_offsets], buffer_read_size);
+
+			component_offset.second = new_offsets;
+		}
+
+		size_ = size;
+		capacity_ += new_size - old_size;
+		buffer_.release();
+		buffer_ = std::move(tmp_buffer);
+	}
+
 	// Debug専用 このクラスが指定されたコンポーネントを保持しているか確認
 	// 保持している場合は何もないが保持していない場合はアサートが出る
 	template<class ...Components>
@@ -209,7 +241,7 @@ private:
 	{
 #ifdef _DEBUG
 		const bool result{ Contains<Components...>() };
-		_ASSERT_EXPR(result, L"持っていないよ");
+		_ASSERT_EXPR(result, L"保持していないComponentが指定されました");
 #endif
 	}
 

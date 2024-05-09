@@ -100,6 +100,8 @@ namespace ecs
 		}
 
 		// ComponentArrayの配列を取得 指定された全Componentを返す
+		// 注意 :	戻り値をインスタンスとして所持し続けるのはだめ Entityの追加や削除によるデータの変動を保証できない
+		//			そのため、スコープ内でのみの使用とし、次にまた使いたいときは同じようにして取得すること
 		// T 取得したいComponentの型
 		template<class T>
 		Vector<ComponentArray<T>> GetComponentArrays()
