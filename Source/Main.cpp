@@ -5,14 +5,11 @@
 #include "Chunk.h"
 #include "World.h"
 #include "PerformanceCounter.h"
+#include "System.h"
 
 constexpr float kFactor{ 1.0f };
-constexpr int kNumObjects{ 20000 };
-constexpr int kTestCounts{ 1000 };
-int test_index_ecs{ 0 };
-int test_index_com{ 0 };
-double performance_counters_ecs[kTestCounts]{ 0 };
-double performance_counters_com[kTestCounts]{ 0 };
+constexpr int kNumObjects{ 200 };
+
 
 struct Transform
 {
@@ -56,17 +53,27 @@ public:
 	}
 };
 
+
 class UpdateTransform : public ecs::BaseSystem
 {
 public:
 	UpdateTransform() = default;
 
+
+	static void Update(Transform& t)
+	{
+		std::cout << "Position: x: " << t.position_.x << " y: " << t.position_.y << " z: " << t.position_.z << std::endl;
+		const XMMATRIX S{ XMMatrixScaling(t.scaling_.x, t.scaling_.y, t.scaling_.z) };
+		const XMMATRIX R{ XMMatrixRotationRollPitchYaw(t.rotation_.x, t.rotation_.y, t.rotation_.z) };
+		const XMMATRIX T{ XMMatrixTranslation(t.position_.x, t.position_.y, t.position_.z) };
+		const XMMATRIX W{ S * R * T };
+		XMStoreFloat4x4(&t.world_matrix_, W);
+	}
+	
 	void Execute() override
 	{
-		u32 clock_index{ PerformanceCounter::Begin() };
-		Vector<float3> positions;
-		Vector<float4x4> world_matrix;
-		auto transform_array{ world_->GetComponentArrays<Transform>() };
+		Foreach<Transform>(&Update);
+		/*auto transform_array{ world_->GetComponentArrays<Transform>() };
 		for(auto array : transform_array)
 		{
 			for(auto& t : array)
@@ -77,81 +84,24 @@ public:
 				const XMMATRIX W{ S * R * T };
 				XMStoreFloat4x4(&t.world_matrix_, W);
 			}
-		}
-
-		performance_counters_ecs[test_index_ecs] = PerformanceCounter::End(clock_index);
+		}*/
 	}
 
 private:
 };
 
-class GameObject;
-class BaseComponent
+class UpdateCamera : public ecs::BaseSystem
 {
 public:
-	BaseComponent() = default;
+	UpdateCamera() = default;
 
-	virtual void Update() {};
-	SharedPtr<GameObject> owner_;
-};
-
-class TransformCom : public BaseComponent
-{
-public:
-	TransformCom(int index)
+	void Execute() override
 	{
-		position_.x = kFactor * index;
-		position_.y = kFactor * index;
-		position_.z = kFactor * index;
-		scaling_ = float3(1.0f, 1.0f, 1.0f);
-		rotation_ = float4(0.0f, 0.0f, 0.0f, 1.0f);
-	};
-
-	void Update() override
-	{
-		const float3 s{ scaling_ };
-		const float4 r{ rotation_ };
-		const float3 p{ position_ };
-		const XMMATRIX S{ XMMatrixScaling(s.x, s.y, s.z) };
-		const XMMATRIX R{ XMMatrixRotationRollPitchYaw(r.x, r.y, r.z) };
-		const XMMATRIX T{ XMMatrixTranslation(p.x, p.y, p.z) };
-		const XMMATRIX W{ S * R * T };
-		XMStoreFloat4x4(&world_matrix_, W);
+		//Foreach<Transform>(&Update);
 	}
-	
-	float3 position_;
-	float3 scaling_;
-	float4 rotation_;
-
-	float4x4 world_matrix_
-	{
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f
-	};
-};
-class GameObject
-{
-public:
-	GameObject(int i)
-	{
-		components_.emplace_back(std::make_shared<TransformCom>(i));
-	}
-
-	void Update()
-	{
-		for(auto& c : components_)
-		{
-			c->Update();
-		}
-	}
-
-	Vector<SharedPtr<BaseComponent>> components_;
 };
 int main()
 {
-	Vector<SharedPtr<GameObject>> game_objects_;
 	ecs::World world;
 	world.AddArchetype<Transform>();
 	world.AddArchetype<Transform, Camera>();
@@ -165,85 +115,44 @@ int main()
 
 	for(int i = 0; i < kNumObjects; ++i)
 	{
-		if(i % 2 == 0)
+		if(i % 3 == 0)
 		{
 			entities.emplace_back(world.AddEntity<Transform>());
 		}
-		else
+		else if(i % 3 == 1)
 		{
 			entities.emplace_back(world.AddEntity<Transform, Camera>());
+		}
+		else
+		{
+			entities.emplace_back(world.AddEntity<Transform, Camera, DirectionLight>());
 		}
 		t.position_.x = kFactor * i;
 		t.position_.y = kFactor * i;
 		t.position_.z = kFactor * i;
 		world.SetComponentData(entities.at(i), t);
-
-		game_objects_.emplace_back(std::make_shared<GameObject>(i));
 	}
 
-	world.AddSystems<UpdateTransform>();
+	world.GetSystemManager()->AddSystems<UpdateTransform>();
+	//world.AddSystems<UpdateTransform>();
 
-	for(int i = 0; i < kTestCounts; ++i)
+	world.ExecuteSystems();
+
+	Vector<ComponentArray<Transform>> arrays{ world.GetComponentArrays<Transform>() };
+
+	Vector<Transform> t_array;
+	Vector<float4x4> world_matrix_array;
+	for(const ComponentArray<Transform>& array : arrays)
 	{
-		world.ExecuteSystems();
-		++test_index_ecs;
-	}
-
-	//Vector<ComponentArray<Transform>> arrays{ world.GetComponentArrays<Transform>() };
-
-	//Vector<Transform> t_array;
-	//Vector<float4x4> world_matrix_array;
-	//for(const ComponentArray<Transform>& array : arrays)
-	//{
-	//	for(const auto t : array)
-	//	{
-	//		t_array.emplace_back(t);
-	//		world_matrix_array.emplace_back(t.world_matrix_);
-	//	}
-	//}
-
-	
-	for(int i = 0; i < kTestCounts; ++i)
-	{
-		u32 clock_index{ PerformanceCounter::Begin() };
-		for(int j = 0; j < kNumObjects; ++j)
+		for(const auto t : array)
 		{
-			game_objects_.at(j)->Update();
+			t_array.emplace_back(t);
+			world_matrix_array.emplace_back(t.world_matrix_);
 		}
-		performance_counters_com[test_index_com] = PerformanceCounter::End(clock_index);
-		++test_index_com;
 	}
 
 	//world.RemoveEntity(entities.at(0));
 	//Entity entity = world.AddEntity<Transform>();
-
-	double sum_ecs{ 0 };
-	double sum_com{ 0 };
-	double max_ecs{ 0 };
-	double max_com{ 0 };
-	double min_ecs{ 1000.0 };
-	double min_com{ 1000.0 };
-	for(int i = 0; i < kTestCounts; ++i)
-	{
-		if(max_ecs < performance_counters_ecs[i]) max_ecs = performance_counters_ecs[i];
-		if(min_ecs > performance_counters_ecs[i]) min_ecs = performance_counters_ecs[i];
-		if(max_com < performance_counters_com[i]) max_com = performance_counters_com[i];
-		if(min_com > performance_counters_com[i]) min_com = performance_counters_com[i];
-		sum_ecs += performance_counters_ecs[i];
-		sum_com += performance_counters_com[i];
-		std::cout << "ECS : " << performance_counters_ecs[i] << "[ms]" << std::endl;
-		std::cout << "COM : " << performance_counters_com[i] << "[ms]" << std::endl;
-	}
-
-	std::cout << "Average" << std::endl;
-	std::cout << "ECS : " << sum_ecs / kTestCounts << std::endl;
-	std::cout << "COM : " << sum_com / kTestCounts << std::endl;
-	std::cout << "MAX" << std::endl;
-	std::cout << "ECS : " << max_ecs / kTestCounts << std::endl;
-	std::cout << "COM : " << max_com / kTestCounts << std::endl;
-	std::cout << "MIN" << std::endl;
-	std::cout << "ECS : " << min_ecs / kTestCounts << std::endl;
-	std::cout << "COM : " << min_com / kTestCounts << std::endl;
 
 	return 0;
 }

@@ -5,16 +5,18 @@
 #include "Archetype.h"
 #include "Entity.h"
 #include "Chunk.h"
-#include "System.h"
 
 
 namespace ecs
 {
+	class SystemBase;
+	class SystemManager;
+
 	class World
 	{
 		using ChunkPtr = SharedPtr<Chunk>;
 	public:
-		World() = default;
+		World();
 		~World() = default;
 
 		World(const World&) = delete;
@@ -23,10 +25,7 @@ namespace ecs
 		World(World&&) = default;
 		World& operator=(World&&) = default;
 
-		void ExecuteSystems()
-		{
-			system_manager_.Execute();
-		}
+		void ExecuteSystems();
 
 		// Archetypeの追加 テンプレートでChunkに保持させたいComponentを指定する
 		// もしすでに同じコンポーネントを保持しているChunkがあるときはそのChunkのポインターを返す
@@ -117,11 +116,18 @@ namespace ecs
 			return arrays;
 		}
 
-		template<class ...Systems>
-		void AddSystems()
+		template<class ...Components>
+		Vector<ChunkPtr> GetChunkList()
 		{
-			system_manager_.AddSystems<Systems...>(this);
+			Vector<ChunkPtr> ret{};
+			for(auto& chunk : chunks_ | std::views::values)
+			{
+				if(chunk->Contains<Components...>()) ret.emplace_back(chunk);
+			}
+			return ret;
 		}
+
+		SystemManager* GetSystemManager() const { return system_manager_.get(); }
 
 	private:
 
@@ -159,7 +165,8 @@ namespace ecs
 		EntityManager entity_manager_{};
 		UnorderedMap<Entity, ArchetypeId> entity_archetype_map_{};
 		UnorderedMap<ArchetypeId, ChunkPtr> chunks_{};
-		SystemManager system_manager_{};
+		UniquePtr<SystemManager> system_manager_{};
 	};
+
 	
 }

@@ -31,11 +31,14 @@ public:
 		return true;
 	}
 
+	// w’è‚³‚ê‚½Components‚ğ•Û‚µ‚Ä‚¢‚é‚©
 	template<class ...Components>
 	bool Contains() const
 	{
 		return ContainsImpl<Components...>();
 	}
+
+
 
 	ArchetypeId GetArchetypeId() const { return archetype_id_; }
 

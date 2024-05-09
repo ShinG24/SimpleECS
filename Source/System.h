@@ -2,11 +2,10 @@
 
 #include "CommonHeader.h"
 #include "ECSCommon.h"
-
+#include "World.h"
 
 namespace ecs
 {
-	class World;
 	class BaseSystem
 	{
 		friend class SystemManager;
@@ -16,9 +15,52 @@ namespace ecs
 
 		virtual void Execute() {};
 
+	protected:
+
+		template<class T0>
+		void Foreach(std::function<void(T0&)> func)
+		{
+			world_->GetComponentArrays<T0>();
+			Vector<SharedPtr<Chunk>> chunk_list{ world_->GetChunkList<T0>() };
+			for(auto&& chunk : chunk_list)
+			{
+				auto args{ chunk->GetComponentArray<T0>() };
+				ForeachImpl(chunk.get(), func, args);
+			}
+		}
+
+		//template<class T0, typename Func>
+//		void Foreach(Func&& func)
+//		{
+//			world_->GetComponentArrays<T0>();
+//			Vector<SharedPtr<Chunk>> chunk_list{ world_->GetChunkList<T0>() };
+//			for(auto&& chunk : chunk_list)
+//			{
+//				auto args{ chunk->GetComponentArray<T0>() };
+//				ForeachImpl(chunk.get(), func, args);
+//			}
+//		}
+
 	private:
 
 		void SetWorld(World* world) { world_ = world; }
+
+		template<typename Func, typename... Args>
+		static void ForeachImpl( Chunk* pChunk, Func&& func, Args ... args )
+		{
+			for ( std::uint32_t i = 0; i < pChunk->GetEntityCounts(); ++i )
+			{
+				func( args[i]... );
+			}
+		}
+		//template<class ...Components>
+		//static void ForeachImpl(SharedPtr<Chunk> chunk, std::function<void(Components&&... args)> function, Components&& ...components)
+		//{
+		//	for(u32 i = 0; chunk->GetEntityCounts(); ++i)
+		//	{
+		//		function(components[i]...);
+		//	}
+		//}
 
 	protected:
 		World* world_;
@@ -27,7 +69,7 @@ namespace ecs
 	class SystemManager
 	{
 	public:
-		SystemManager() = default;
+		SystemManager(World* world) : world_(world) {}
 
 		void Execute()
 		{
@@ -37,10 +79,10 @@ namespace ecs
 			}
 		}
 		template<class ...Systems>
-		void AddSystems(World* world)
+		void AddSystems()
 		{
-			_ASSERT_EXPR(world, L"World‚ªnullptr‚Å‚µ‚½");
-			AddSystemImpl<Systems...>(world);
+			_ASSERT_EXPR(world_, L"World‚ªnullptr‚Å‚µ‚½");
+			AddSystemImpl<Systems...>();
 		}
 
 		template<class ...Systems>
@@ -49,7 +91,7 @@ namespace ecs
 	private:
 
 		template<class Head, class ...Tails>
-		void AddSystemImpl(World* world)
+		void AddSystemImpl()
 		{
 			IsBaseOfBaseSystem<Head>();
 
@@ -57,11 +99,11 @@ namespace ecs
 			if(!system_ids_.contains(id))
 			{
 				UniquePtr<Head> system{ std::make_unique<Head>() };
-				system->SetWorld(world);
+				system->SetWorld(world_);
 				systems_.emplace_back(std::move(system));
 			}
 
-			if constexpr(sizeof...(Tails) != 0) AddSystemImpl<Tails...>(world);
+			if constexpr(sizeof...(Tails) != 0) AddSystemImpl<Tails...>(world_);
 		}
 
 	private:
@@ -73,7 +115,7 @@ namespace ecs
 		}
 
 	private:
-
+		World* world_;
 		Vector<UniquePtr<BaseSystem>> systems_;
 #ifdef _DEBUG
 		UnorderedSet<u64> system_ids_;

@@ -116,14 +116,15 @@ public:
 	template<class Component>
 	ComponentArray<Component> GetComponentArray()
 	{
-		const ComponentId id{ GET_COMPONENT_ID(Component) };
+		using TType = std::remove_const_t<std::remove_reference_t<Component>>;
+		const ComponentId id{ GET_COMPONENT_ID(TType) };
 		const u32 size{ size_ - capacity_ };
 
-		_ASSERT_EXPR(archetype_.Contains<Component>(), L"•Û‚µ‚Ä‚¢‚È‚¢Œ^‚ªw’è‚³‚ê‚Ü‚µ‚½");
+		_ASSERT_EXPR(archetype_.Contains<TType>(), L"•Û‚µ‚Ä‚¢‚È‚¢Œ^‚ªw’è‚³‚ê‚Ü‚µ‚½");
 
 		const u32 offset{ component_offsets_.at(id) };
 		void* begin{ &buffer_[offset] };
-		ComponentArray<Component> ret(static_cast<Component*>(begin), size);
+		ComponentArray<TType> ret(static_cast<TType*>(begin), size);
 
 		return ret;
 	}
@@ -206,7 +207,7 @@ public:
 	}
 
 	[[nodiscard]] const Archetype& GetArchetype() const { return archetype_; }
-
+	u32 GetEntityCounts() const { return size_ - capacity_; }
 private:
 
 	void Resize(u32 size)
