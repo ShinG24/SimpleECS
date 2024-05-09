@@ -17,29 +17,28 @@ namespace ecs
 
 	protected:
 
-		template<class T0>
-		void Foreach(std::function<void(T0&)> func)
+		template<class T>
+		void Foreach(std::function<void(T&)>&& func)
 		{
-			world_->GetComponentArrays<T0>();
-			Vector<SharedPtr<Chunk>> chunk_list{ world_->GetChunkList<T0>() };
+			Vector<SharedPtr<Chunk>> chunk_list{ world_->GetChunkList<T>() };
 			for(auto&& chunk : chunk_list)
 			{
-				auto args{ chunk->GetComponentArray<T0>() };
+				auto args{ chunk->GetComponentArray<T>() };
 				ForeachImpl(chunk.get(), func, args);
 			}
 		}
 
-		//template<class T0, typename Func>
-//		void Foreach(Func&& func)
-//		{
-//			world_->GetComponentArrays<T0>();
-//			Vector<SharedPtr<Chunk>> chunk_list{ world_->GetChunkList<T0>() };
-//			for(auto&& chunk : chunk_list)
-//			{
-//				auto args{ chunk->GetComponentArray<T0>() };
-//				ForeachImpl(chunk.get(), func, args);
-//			}
-//		}
+		template<class T0, class T1>
+		void Foreach(std::function<void(T0&, T1&)>&& func)
+		{
+			Vector<SharedPtr<Chunk>> chunk_list{ world_->GetChunkList<T0, T1>() };
+			for(auto&& chunk : chunk_list)
+			{
+				auto args0{ chunk->GetComponentArray<T0>() };
+				auto args1{ chunk->GetComponentArray<T1>() };
+				ForeachImpl(chunk.get(), func, args0, args1);
+			}
+		}
 
 	private:
 
@@ -53,14 +52,6 @@ namespace ecs
 				func( args[i]... );
 			}
 		}
-		//template<class ...Components>
-		//static void ForeachImpl(SharedPtr<Chunk> chunk, std::function<void(Components&&... args)> function, Components&& ...components)
-		//{
-		//	for(u32 i = 0; chunk->GetEntityCounts(); ++i)
-		//	{
-		//		function(components[i]...);
-		//	}
-		//}
 
 	protected:
 		World* world_;
@@ -103,7 +94,7 @@ namespace ecs
 				systems_.emplace_back(std::move(system));
 			}
 
-			if constexpr(sizeof...(Tails) != 0) AddSystemImpl<Tails...>(world_);
+			if constexpr(sizeof...(Tails) != 0) AddSystemImpl<Tails...>();
 		}
 
 	private:

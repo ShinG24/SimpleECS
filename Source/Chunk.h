@@ -116,15 +116,17 @@ public:
 	template<class Component>
 	ComponentArray<Component> GetComponentArray()
 	{
-		using TType = std::remove_const_t<std::remove_reference_t<Component>>;
-		const ComponentId id{ GET_COMPONENT_ID(TType) };
+		const ComponentId id{ GET_COMPONENT_ID(Component) };
 		const u32 size{ size_ - capacity_ };
 
-		_ASSERT_EXPR(archetype_.Contains<TType>(), L"•Û‚µ‚Ä‚¢‚È‚¢Œ^‚ªw’è‚³‚ê‚Ü‚µ‚½");
+		if(!archetype_.Contains<Component>())
+		{
+			_ASSERT_EXPR(archetype_.Contains<Component>(), L"•Û‚µ‚Ä‚¢‚È‚¢Œ^‚ªw’è‚³‚ê‚Ü‚µ‚½");
+		}
 
 		const u32 offset{ component_offsets_.at(id) };
 		void* begin{ &buffer_[offset] };
-		ComponentArray<TType> ret(static_cast<TType*>(begin), size);
+		ComponentArray<Component> ret(static_cast<Component*>(begin), size);
 
 		return ret;
 	}

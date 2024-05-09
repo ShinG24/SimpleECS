@@ -95,9 +95,15 @@ class UpdateCamera : public ecs::BaseSystem
 public:
 	UpdateCamera() = default;
 
+	inline static int i = 0;
+	static void Update(Transform& t, Camera& c)
+	{
+		c.focus_ = float3(i, i, i);
+		++i;
+	}
 	void Execute() override
 	{
-		//Foreach<Transform>(&Update);
+		Foreach<Transform, Camera>(&Update);
 	}
 };
 int main()
@@ -133,7 +139,7 @@ int main()
 		world.SetComponentData(entities.at(i), t);
 	}
 
-	world.GetSystemManager()->AddSystems<UpdateTransform>();
+	world.GetSystemManager()->AddSystems<UpdateTransform, UpdateCamera>();
 	//world.AddSystems<UpdateTransform>();
 
 	world.ExecuteSystems();
@@ -148,6 +154,16 @@ int main()
 		{
 			t_array.emplace_back(t);
 			world_matrix_array.emplace_back(t.world_matrix_);
+		}
+	}
+
+	Vector<ComponentArray<Camera>> c_arrays{ world.GetComponentArrays<Camera>() };
+	Vector<float3> focus;
+	for(const auto& array : c_arrays)
+	{
+		for(const auto& c : array)
+		{
+			focus.emplace_back(c.focus_);
 		}
 	}
 
