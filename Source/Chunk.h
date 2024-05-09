@@ -6,9 +6,6 @@
 #include "Entity.h"
 #include "ComponentArray.h"
 
-#define ALLOW_BLANK 0
-
-
 class Chunk
 {
 public:
@@ -154,25 +151,8 @@ public:
 	void AddEntity(Entity entity)
 	{
 		if(entity_index_.contains(entity)) _ASSERT_EXPR(FALSE, L"すでに持っているEntityを渡さないでください");
-		u32 index{};
-
-#if ALLOW_BLANK
-		// free_indexに値が入っているかどうかで処理を変える
-		// 可能な限りデータを連続させたいのでfree_indexの値を優先して使う
-		if(!free_indices_.empty())
-		{
-			const auto it{ free_indices_.begin() };
-			index = (*it);
-			free_indices_.erase(it);
-		}
-		else
-		{
-			index = size_ - capacity_;
-		}
-#else
-		index = size_ - capacity_;
+		u32 index{ size_ - capacity_ };
 		index_entity_map_.insert({ index, entity });
-#endif
 		entity_index_.insert({ entity, index });
 
 		--capacity_;
@@ -188,30 +168,10 @@ public:
 		const u32 free_index{ it->second };
 		entity_index_.erase(it);
 
-#if ALLOW_BLANK
-		free_indices_.insert(index);
-#else
-
-		// TODO Entityの削除処理について考える
-		// 以下の処理を行うことで確実にデータが連続した状態になるので更新処理などは早くなる
-		// ただし、一番うしろのデータが誰かわからないのでfor分を回して探す必要がある O(n)の処理負荷
-		// 多少のメモリを犠牲にするならindexからEntityを見つけるmapを作る
-
 		// 一番最後に割り当てたデータを空いたところに移動させる
 		// sizeとcapacityから一番後ろのindexを割り出し
 		const u32 end_index{ size_ - (capacity_ + 1) };
 
-#if 0
-		// entityとindexを紐づけている値を更新
-		for(auto& value : entity_index_)
-		{
-			if(value.second == end_index)
-			{
-				value.second = index;
-				break;
-			}
-		}
-#else
 
 		// index_entity_mapからBufferの最後尾を割り当てられているEntityを取得
 		// EntityとIndexを紐づけているデータを更新
@@ -222,10 +182,6 @@ public:
 		entity_index_.at(end_entity) = free_index;
 		index_entity_map_.erase(ie_it);
 		index_entity_map_.at(free_index) = end_entity;
-
-#endif
-
-
 
 		// comopnentのデータを入れ替え
 		for(const auto component_offset : component_offsets_)
@@ -240,7 +196,6 @@ public:
 		}
 
 		++capacity_;
-#endif
 	}
 
 	[[nodiscard]] const Archetype& GetArchetype() const { return archetype_; }
@@ -266,10 +221,5 @@ private:
 	u32 capacity_{};	// バイトではなく個数
 	UnorderedMap<Entity, u32> entity_index_{};	// Entity→Component Array Index 保持しているEntityとComponentArrayのどこにデータが入っているかを示すIndexのマップ
 	UnorderedMap<ComponentId, u32> component_offsets_{};	// 各コンポーネントが格納されているアドレスのオフセット//buffer_の先頭からのオフセット
-
-#if ALLOW_BLANK
-	UnorderedSet<u32> free_indices_{};
-#else
 	UnorderedMap<u32, Entity> index_entity_map_{};	// 割り当てられてるIndexからEntityを特定するためのmap
-#endif
 };
