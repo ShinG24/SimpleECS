@@ -75,6 +75,7 @@ namespace ecs
 			entity_manager_.RemoveEntity(entity);
 		}
 
+
 		// Componentのデータをセット
 		// Component セットしたいComponentの型
 		// entity そのコンポーネントを保持しているEntityのID

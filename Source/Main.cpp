@@ -69,22 +69,10 @@ public:
 		const XMMATRIX W{ S * R * T };
 		XMStoreFloat4x4(&t.world_matrix_, W);
 	}
-	
+
 	void Execute() override
 	{
 		Foreach<Transform>(&Update);
-		/*auto transform_array{ world_->GetComponentArrays<Transform>() };
-		for(auto array : transform_array)
-		{
-			for(auto& t : array)
-			{
-				const XMMATRIX S{ XMMatrixScaling(t.scaling_.x, t.scaling_.y, t.scaling_.z) };
-				const XMMATRIX R{ XMMatrixRotationRollPitchYaw(t.rotation_.x, t.rotation_.y, t.rotation_.z) };
-				const XMMATRIX T{ XMMatrixTranslation(t.position_.x, t.position_.y, t.position_.z) };
-				const XMMATRIX W{ S * R * T };
-				XMStoreFloat4x4(&t.world_matrix_, W);
-			}
-		}*/
 	}
 
 private:
@@ -166,9 +154,6 @@ int main()
 			focus.emplace_back(c.focus_);
 		}
 	}
-
-	//world.RemoveEntity(entities.at(0));
-	//Entity entity = world.AddEntity<Transform>();
 
 	return 0;
 }
